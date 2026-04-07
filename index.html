@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viral Trend Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg:#020b18; --surface:#041220; --surface2:#071c30; --border:#0f4c6e; --accent:#00e5ff; --accent2:#ff003c; --accent3:#39ff14; --text:#b0d4e8; --text-dim:#4a7a99; }
+        * { box-sizing:border-box; margin:0; padding:0; }
+        body { min-height:100vh; font-family:'Share Tech Mono',monospace; background:var(--bg); color:var(--text); }
+        body::before { content:""; position:fixed; inset:0; background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px); background-size:40px 40px; pointer-events:none; }
+        .wrap { position:relative; z-index:1; }
+        .header,.panel-header { display:flex; justify-content:space-between; gap:16px; }
+        .header { padding:16px 24px; flex-wrap:wrap; border-bottom:1px solid var(--border); background:linear-gradient(90deg,#020b18,#041c30,#020b18); }
+        .header-title,.panel-title,.panel-header-title,.search-btn,.report-label,.ptag { font-family:'Orbitron',sans-serif; }
+        .header-title { color:var(--accent); letter-spacing:2px; font-weight:900; }
+        .header-title span { color:var(--accent2); }
+        .status-bar { display:flex; gap:16px; flex-wrap:wrap; font-size:11px; color:var(--text-dim); }
+        .status-dot,.ai-dot { display:inline-block; border-radius:50%; }
+        .status-dot { width:7px; height:7px; margin-right:5px; background:var(--accent3); box-shadow:0 0 8px var(--accent3); animation:blink 1.2s infinite; }
+        @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+        .search-box { padding:28px 20px 20px; display:flex; justify-content:center; }
+        .search-wrap { width:min(100%,880px); display:flex; flex-direction:column; gap:10px; align-items:center; }
+        .search-label,.helper,.section-header,.post-block-label,.chart-label,.info-cell-label,.panel-header-title,.ai-report-header-title { color:var(--text-dim); letter-spacing:2px; }
+        .search-label { font-size:11px; }
+        .helper,.topic-snippet,.topic-time,.topic-link,.post-block-text,.ai-report-body,.source-check-item { font-size:11px; }
+        .helper { line-height:1.6; text-align:center; }
+        .search-controls { width:100%; display:flex; justify-content:center; flex-wrap:wrap; gap:10px; }
+        #keyword,.dropdown-trigger,.search-btn { padding:11px 14px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-family:inherit; }
+        #keyword { width:min(320px,100%); outline:none; }
+        #keyword:focus,.dropdown-trigger:hover,.topic:hover { border-color:var(--accent); }
+        .dropdown-wrap { position:relative; }
+        .dropdown-trigger { min-width:170px; display:flex; justify-content:space-between; gap:10px; cursor:pointer; }
+        .dropdown-menu { display:none; position:absolute; top:calc(100% + 4px); left:0; min-width:100%; z-index:20; border:1px solid var(--border); background:var(--surface); }
+        .dropdown-menu.open,.overlay.active { display:block; }
+        .dropdown-item { padding:10px 12px; cursor:pointer; font-size:12px; border-bottom:1px solid rgba(15,76,110,.3); }
+        .dropdown-item:hover,.dropdown-item.selected { color:var(--accent); background:rgba(0,229,255,.06); }
+        .search-btn { border:none; background:var(--accent); color:var(--bg); font-weight:700; cursor:pointer; }
+        .main-grid { display:none; grid-template-columns:1fr 1fr; padding:0 24px 36px; }
+        .main-grid.visible { display:grid; }
+        .col { padding:16px 14px; }
+        .col-left { border-right:1px solid var(--border); }
+        .section-header,.topic-top,.topic-footer,.source-check-item,.ai-report-header { display:flex; justify-content:space-between; gap:10px; }
+        .section-header { padding-bottom:8px; margin-bottom:14px; border-bottom:1px solid var(--border); font-size:10px; }
+        .topic,.post-block,.info-cell,.ai-report-section { border:1px solid var(--border); background:var(--surface); }
+        .topic { padding:14px; margin:10px 0; cursor:pointer; transition:.2s ease; }
+        .topic:hover { background:rgba(0,229,255,.05); transform:translateX(3px); }
+        .topic.hot { border-left:3px solid var(--accent2); }
+        .topic-title,.panel-title { line-height:1.5; }
+        .topic-title { flex:1; font-size:13px; }
+        .topic-snippet { margin:10px 0; color:var(--text-dim); line-height:1.5; }
+        .topic-link { color:var(--accent); text-decoration:none; }
+        .ptag { font-size:8px; padding:1px 4px; border:1px solid currentColor; white-space:nowrap; letter-spacing:.4px; line-height:1.1; max-width:92px; overflow:hidden; text-overflow:ellipsis; border-radius:2px; }
+        .ptag-youtube { color:#ff4444; } .ptag-twitter { color:#1da1f2; } .ptag-gnews { color:#34a853; } .ptag-all { color:var(--accent); }
+        .overlay,.panel { position:fixed; top:0; }
+        .overlay { inset:0; display:none; z-index:40; background:rgba(2,11,24,.65); }
+        .panel { left:-620px; width:min(92vw,580px); height:100%; z-index:50; overflow-y:auto; border-right:1px solid var(--border); background:var(--surface); transition:left .35s ease; }
+        .panel.active { left:0; }
+        .panel-header { position:sticky; top:0; padding:14px 20px; border-bottom:1px solid var(--border); background:linear-gradient(90deg,#041c30,#020b18); }
+        .close-btn { font-size:22px; color:var(--text-dim); cursor:pointer; }
+        .panel-body { padding:20px; }
+        .panel-title { margin-bottom:14px; font-size:13px; }
+        .post-block,.ai-report-section,.info-cell { background:var(--surface2); }
+        .post-block,.ai-report-body { padding:14px; }
+        .post-block-text,.ai-report-body { line-height:1.8; }
+        .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px; }
+        .info-cell { padding:10px 12px; }
+        .info-cell-label,.report-label { font-size:9px; }
+        .info-cell-value { font-size:13px; color:var(--accent); }
+        .verify-bar-track { height:6px; margin-top:6px; background:rgba(255,255,255,.08); }
+        .verify-bar-fill { height:100%; }
+        .trust-factor-list { display:flex; flex-direction:column; gap:10px; }
+        .trust-factor { padding:10px 0; border-bottom:1px solid rgba(15,76,110,.3); }
+        .trust-factor:last-child { border-bottom:none; padding-bottom:0; }
+        .trust-factor-top { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+        .trust-factor-name { font-size:11px; color:var(--text); }
+        .trust-factor-pct { font-size:11px; color:var(--accent); }
+        .source-check-item { padding:6px 0; border-bottom:1px solid rgba(15,76,110,.3); }
+        .source-toggle { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; padding:10px 12px; border:1px solid rgba(15,76,110,.5); background:rgba(0,229,255,.04); color:var(--text); cursor:pointer; }
+        .source-toggle .arrow { color:var(--accent); transition:transform .2s ease; }
+        .source-toggle.open .arrow { transform:rotate(180deg); }
+        .source-list { display:none; margin-top:10px; border-top:1px solid rgba(15,76,110,.35); }
+        .source-list.open { display:block; }
+        .source-entry { display:grid; grid-template-columns:1fr auto; gap:8px; padding:10px 0; border-bottom:1px solid rgba(15,76,110,.3); }
+        .source-entry:last-child { border-bottom:none; }
+        .source-entry-main { display:flex; flex-direction:column; gap:4px; min-width:0; }
+        .source-entry-name { color:var(--text); font-size:12px; }
+        .source-entry-meta { color:var(--text-dim); font-size:10px; letter-spacing:1px; }
+        .source-entry-link { color:var(--accent); text-decoration:none; font-size:11px; white-space:nowrap; }
+        .found { color:var(--accent3); } .partial { color:#ffaa00; } .not-found { color:var(--accent2); }
+        .ai-report-header { align-items:center; padding:10px 14px; border-bottom:1px solid var(--border); }
+        .ai-dot { width:8px; height:8px; background:var(--accent); box-shadow:0 0 8px var(--accent); }
+        .ai-report-body { min-height:80px; }
+        .loading { color:var(--text-dim); font-style:italic; }
+        .report-label { color:var(--accent); letter-spacing:1px; margin-right:6px; }
+        .report-line { display:block; margin-bottom:6px; }
+        .verdict-box { margin-top:10px; padding:10px 12px; font-family:'Orbitron',sans-serif; font-size:11px; }
+        .verdict-verified { border:1px solid var(--accent3); color:var(--accent3); background:rgba(57,255,20,.08); }
+        .verdict-partial { border:1px solid #ffaa00; color:#ffaa00; background:rgba(255,170,0,.08); }
+        .verdict-unverified { border:1px solid var(--accent2); color:var(--accent2); background:rgba(255,0,60,.08); }
+        @media (max-width:900px) { .main-grid { grid-template-columns:1fr; } .col-left { border-right:none; border-bottom:1px solid var(--border); } }
+        @media (max-width:640px) { .header,.main-grid { padding-left:14px; padding-right:14px; } .search-controls { flex-direction:column; } #keyword,.dropdown-wrap,.dropdown-trigger,.search-btn,.dropdown-menu { width:100%; } .info-grid { grid-template-columns:1fr; } }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="header">
+        <div class="header-title">&#x25A0; <span>VIRAL</span> TREND ANALYSIS</div>
+        <div class="status-bar">
+            <div><span class="status-dot"></span>LIVE FEED ACTIVE</div>
+            <div>SYS: SECURE</div>
+            <div id="clock"></div>
+        </div>
+    </div>
+    <div class="search-box">
+        <div class="search-wrap">
+            <div class="search-label">[ ENTER KEYWORD | CHOOSE PLATFORM ]</div>
+            <div class="search-controls">
+                <input type="text" id="keyword" placeholder="Search any topic..." onkeydown="if(event.key==='Enter') loadData()">
+                <div class="dropdown-wrap" id="dropWrap">
+                    <div class="dropdown-trigger" onclick="toggleDropdown()">
+                        <span id="dropLabel">ALL PLATFORMS</span>
+                        <span>&#x25BC;</span>
+                    </div>
+                    <div class="dropdown-menu" id="dropMenu">
+                        <div class="dropdown-item selected" data-platform="All" onclick="selectPlatform(this)">All Platforms</div>
+                        <div class="dropdown-item" data-platform="YouTube" onclick="selectPlatform(this)">YouTube</div>
+                        <div class="dropdown-item" data-platform="Twitter" onclick="selectPlatform(this)">Twitter / X</div>
+                        <div class="dropdown-item" data-platform="GNews" onclick="selectPlatform(this)">GNews</div>
+                    </div>
+                </div>
+                <button class="search-btn" onclick="loadData()">SCAN &rsaquo;</button>
+            </div>
+            <div class="helper">Keep your API keys in `.env`. The backend can use YouTube, GNews, and X/Twitter when a bearer token is added.</div>
+        </div>
+    </div>
+    <div class="main-grid" id="mainGrid">
+        <div class="col col-left">
+            <div class="section-header"><span style="color:var(--accent2)">&#x1F525; HOT TOPICS</span><span id="hotCount"></span></div>
+            <div id="hotTopics"></div>
+        </div>
+        <div class="col">
+            <div class="section-header"><span style="color:var(--accent)">// RELATED TOPICS</span><span id="relCount"></span></div>
+            <div id="relTopics"></div>
+        </div>
+    </div>
+</div>
+<div class="overlay" id="overlay" onclick="closePanel()"></div>
+<div class="panel" id="panel">
+    <div class="panel-header">
+        <div class="panel-header-title">&#x25CF; VIRAL NEWS ANALYSIS</div>
+        <span class="close-btn" onclick="closePanel()">&#x2715;</span>
+    </div>
+    <div class="panel-body">
+        <div id="details"></div>
+        <div class="chart-label">// VIRALITY TIMELINE</div>
+        <canvas id="timelineChart" height="130"></canvas>
+        <div class="ai-report-section">
+            <div class="ai-report-header"><div class="ai-dot"></div><div class="ai-report-header-title">AI INTELLIGENCE REPORT</div></div>
+            <div class="ai-report-body loading" id="aiReportBody">Initialising analysis...</div>
+        </div>
+    </div>
+</div>
+<script>
+let globalData = [];
+let timelineChartInst = null;
+let selectedPlatform = "All";
+const PLATFORM_LABELS = { All:"ALL PLATFORMS", YouTube:"YOUTUBE", Twitter:"TWITTER / X", GNews:"GNEWS" };
+
+function updateClock() { document.getElementById("clock").textContent = new Date().toISOString().replace("T"," ").slice(0,19) + " UTC"; }
+setInterval(updateClock, 1000); updateClock();
+function toggleDropdown() { document.getElementById("dropMenu").classList.toggle("open"); }
+function selectPlatform(el) { document.querySelectorAll(".dropdown-item").forEach(i => i.classList.remove("selected")); el.classList.add("selected"); selectedPlatform = el.dataset.platform; document.getElementById("dropLabel").textContent = PLATFORM_LABELS[selectedPlatform]; document.getElementById("dropMenu").classList.remove("open"); }
+document.addEventListener("click", event => { const wrap = document.getElementById("dropWrap"); if (!wrap.contains(event.target)) document.getElementById("dropMenu").classList.remove("open"); });
+const escapeHtml = value => String(value).replace(/[&<>"']/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch]));
+const shortText = (text, limit = 120) => text.length > limit ? text.slice(0, limit).trimEnd() + "..." : text;
+const parseCount = value => Number.parseInt(value || "0", 10);
+const formatNumber = value => new Intl.NumberFormat("en-US", { notation:"compact", maximumFractionDigits:1 }).format(value || 0);
+function getVerifyInfo(video) { const pct = Number(video.trustBreakdown?.totalTrustScore || 0); if (pct >= 75) return { pct, color:"#39ff14" }; if (pct >= 50) return { pct, color:"#00e5ff" }; return { pct: pct || (video.trust === "Trusted" ? 91 : video.trust === "Verified" ? 76 : 28), color: pct >= 50 ? "#00e5ff" : "#ff003c" }; }
+function getPlatformTagClass(platform) { return { All:"ptag-all", YouTube:"ptag-youtube", Twitter:"ptag-twitter", GNews:"ptag-gnews", "News API":"ptag-gnews" }[platform] || "ptag-all"; }
+function derivePlatformFromSources(item) {
+    const counts = new Map();
+    (item.matchedSources || []).forEach(source => {
+        const platform = source.platform || item.platform || "All";
+        counts.set(platform, (counts.get(platform) || 0) + 1);
+    });
+    let best = item.platform || "All";
+    let score = -1;
+    counts.forEach((count, platform) => {
+        if (count > score) {
+            best = platform;
+            score = count;
+        }
+    });
+    return best;
+}
+function getTopicPlatformLabel(item) { return item.platform && item.platform !== "All" ? item.platform : derivePlatformFromSources(item); }
+function getTopicPlatformClass(item) { return getPlatformTagClass(getTopicPlatformLabel(item)); }
+function getTrustFromVideo(video) { const views = parseCount(video.viewCount), likes = parseCount(video.likeCount), comments = parseCount(video.commentCount), score = Number(video.score || 0), channelTrusted = /official|news|tv|government|gov|press|times|post|journal|reuters|ap|verified/i.test(video.channel); if (channelTrusted || views > 500000 || (likes > 5000 && comments > 500) || score > 700000) return "Trusted"; if (views > 50000 || likes > 500 || score > 80000) return "Verified"; return "Unverified"; }
+function getOfficialSources(video) { const breakdown = video.trustBreakdown || {}; const statusFromScore = score => score >= 75 ? "found" : score >= 50 ? "partial" : "not-found"; return [{ name:"Channel Reputation", status:statusFromScore(Number(breakdown.channelReputationScore || 0)), label:breakdown.channelReputationLabel || "WEAK" },{ name:"Official Account Verification", status:statusFromScore(Number(breakdown.officialAccountVerificationScore || 0)), label:breakdown.officialAccountVerificationLabel || "UNCONFIRMED" },{ name:"Official News Verification", status:statusFromScore(Number(breakdown.officialNewsVerificationScore || 0)), label:breakdown.officialNewsVerificationLabel || "WEAK" }]; }
+function analyzeTopicName(postText, keyword) { const text = (postText || "").toLowerCase(), subject = keyword.trim(), rules = [{ re:/(official|statement|authorities|government|notice)/, name:`${subject}: Authorities issue official update` },{ re:/(fact-check|clarified|debunk|misleading|rumor)/, name:`${subject}: Fact-check reshapes the narrative` },{ re:/(viral video|clip|footage|surfaces|recording)/, name:`${subject}: Viral footage drives fresh attention` },{ re:/(expert|panel|analysis|impact|implications)/, name:`${subject}: Experts outline wider impact` },{ re:/(community|public|reactions|social platforms|users)/, name:`${subject}: Online reaction spreads fast` },{ re:/(breaking|major development|developing|urgent)/, name:`${subject}: Breaking claim dominates discussion` }], match = rules.find(rule => rule.re.test(text)); if (match) return match.name; const summary = (postText || "").replace(/[^\w\s]/g, " ").split(/\s+/).filter(word => word.length > 3).slice(0, 6).join(" "); return summary ? `${subject}: ${summary}` : `${subject}: Trend gaining momentum online`; }
+async function fetchPlatformItems(keyword, platform) { const url = new URL("/api/search", window.location.origin); url.search = new URLSearchParams({ keyword, platform }).toString(); const response = await fetch(url); const data = await response.json(); if (!response.ok) throw new Error(data.error || "Backend request failed."); return data; }
+async function loadData() { const keyword = document.getElementById("keyword").value.trim(); if (!keyword) return; const hotContainer = document.getElementById("hotTopics"), relatedContainer = document.getElementById("relTopics"), label = selectedPlatform === "All" ? "all selected platforms" : selectedPlatform; document.getElementById("hotCount").textContent = "SCANNING"; document.getElementById("relCount").textContent = "WAIT"; hotContainer.innerHTML = `<div class="topic hot"><div class="topic-title">Loading results for "${escapeHtml(keyword)}" from ${escapeHtml(label)}...<\/div><\/div>`; relatedContainer.innerHTML = ""; document.getElementById("mainGrid").classList.add("visible"); let warning = ""; try { const payload = await fetchPlatformItems(keyword, selectedPlatform); warning = payload.warning || ""; globalData = (payload.items || []).map((item, index, arr) => { const mapped = { ...item, platform:item.platform || selectedPlatform }; mapped.viewCount = mapped.metrics?.views ?? mapped.viewCount ?? 0; mapped.likeCount = mapped.metrics?.likes ?? mapped.likeCount ?? 0; mapped.commentCount = mapped.metrics?.comments ?? mapped.commentCount ?? 0; mapped.trust = mapped.trust || getTrustFromVideo(mapped); mapped.title = mapped.title || mapped.rawTitle || analyzeTopicName(mapped.postText || mapped.rawTitle, keyword); mapped.snippet = mapped.aiSummary || mapped.snippet || shortText(mapped.postText || mapped.rawTitle); mapped.hot = typeof mapped.hot === "boolean" ? mapped.hot : index < Math.min(5, arr.length); return mapped; }); } catch (error) { globalData = []; document.getElementById("hotCount").textContent = "LIMITED"; document.getElementById("relCount").textContent = "--"; hotContainer.innerHTML = `<div class="topic hot"><div class="topic-title">Live sources are temporarily limited<\/div><div class="topic-snippet">${escapeHtml(error.message)}<\/div><\/div>`; return; } if (!globalData.length) { document.getElementById("hotCount").textContent = "0 FOUND"; document.getElementById("relCount").textContent = "0 FOUND"; hotContainer.innerHTML = `<div class="topic hot"><div class="topic-title">${warning ? escapeHtml(warning) : `No results found for "${escapeHtml(keyword)}".`}<\/div><\/div>`; relatedContainer.innerHTML = ""; return; } const hot = globalData.filter(item => item.hot), related = globalData.filter(item => !item.hot); document.getElementById("hotCount").textContent = `${hot.length} FOUND`; document.getElementById("relCount").textContent = `${related.length} FOUND`; renderTopics("hotTopics", hot, true); renderTopics("relTopics", related, false); if (warning && hotContainer.firstElementChild) { hotContainer.insertAdjacentHTML("afterbegin", `<div class="topic hot"><div class="topic-title">${escapeHtml(warning)}<\/div><div class="topic-snippet">Current results may rely on the most recent stored snapshot instead of fully live API data.<\/div><\/div>`); } }
+function renderTopics(containerId, data, isHot) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = "";
+    data.forEach(item => {
+        const itemIndex = globalData.indexOf(item);
+        const platformLabel = getTopicPlatformLabel(item);
+        const platformClass = getTopicPlatformClass(item);
+        const displayTitle = item.title || item.rawTitle || "Untitled topic";
+        const displaySnippet = item.snippet || shortText(item.postText || item.rawTitle || "");
+        const displayTime = formatDisplayTime(item.time);
+        container.innerHTML += `<div class="topic ${isHot ? "hot" : ""}" onclick="openPanelByIndex(${itemIndex})"><div class="topic-top"><div class="topic-title">${escapeHtml(displayTitle)}</div><span class="ptag ${platformClass}">${escapeHtml(platformLabel.toUpperCase())}</span></div><div class="topic-snippet">${escapeHtml(displaySnippet)}</div><div class="topic-footer"><span class="topic-time">&#x25CF; ${displayTime}</span><a class="topic-link" href="${escapeHtml(item.link || "#")}" target="_blank" rel="noopener" onclick="event.stopPropagation()">VIEW SOURCE &rsaquo;</a></div></div>`;
+    });
+}
+function buildReport(video, verify, sources) { if (video.aiReport) { return `[CLAIM SUMMARY]\n${video.aiReport.claim_summary || ""}\n\n[VERIFICATION ANALYSIS]\n${video.aiReport.verification_analysis || ""}\n\n[SPREAD PATTERN]\n${video.aiReport.spread_pattern || ""}\n\n[VERDICT]\n${video.aiReport.verdict || ""}`; } const foundCount = sources.filter(source => source.status === "found").length, sourceText = String(video.postText || video.rawTitle || "a trending topic"), normalizedSourceText = sourceText.charAt(0).toLowerCase() + sourceText.slice(1), claim = `This ${video.platform} topic is built from fetched content: ${normalizedSourceText}. The topic headline is generated from analyzed source content instead of copying one raw post title.`, verification = `Trust is calculated from three factors: channel reputation, verification against official accounts related to the claim, and official news verification. ${video.trustBreakdown?.aiFeedback || "AI checked the topic context and supporting sources to estimate how credible the claim appears."}`, spread = `${video.channel} is one of ${globalData.length} fetched results for this keyword. Metrics: ${video.metricSummary || "limited platform metrics"}.`, verdict = verify.pct >= 80 ? `VERIFIED: ${foundCount} trust factors are strong and the combined trust score is high.` : verify.pct >= 50 ? "PARTIALLY VERIFIED: some trust factors are positive, but the claim still needs stronger confirmation." : "UNVERIFIED: the trust factors are weak or incomplete for this topic."; return `[CLAIM SUMMARY]\n${claim}\n\n[VERIFICATION ANALYSIS]\n${verification}\n\n[SPREAD PATTERN]\n${spread}\n\n[VERDICT]\n${verdict}`; }
+function renderAIReport(text) { const target = document.getElementById("aiReportBody"); target.className = "ai-report-body"; const sections = ["CLAIM SUMMARY","VERIFICATION ANALYSIS","SPREAD PATTERN","VERDICT"]; let html = ""; sections.forEach(section => { const match = text.match(new RegExp(`\\[${section}\\]([\\s\\S]*?)(?=\\[|$)`)); if (!match) return; const content = escapeHtml(match[1].trim()); if (section === "VERDICT") { const cls = /PARTIALLY VERIFIED/i.test(content) ? "verdict-partial" : /VERIFIED:/i.test(content) ? "verdict-verified" : "verdict-unverified"; html += `<div class="verdict-box ${cls}">${content}</div>`; } else { html += `<span class="report-line"><span class="report-label">[${section}]</span>${content}</span>`; } }); target.innerHTML = html || escapeHtml(text); }
+function openPanelByIndex(index) { if (index < 0 || index >= globalData.length) return; openPanel(globalData[index]); }
+function formatDisplayTime(value) {
+    if (!value) return "UNKNOWN TIME";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "UNKNOWN TIME";
+    return escapeHtml(String(parsed.toISOString()).replace("T"," ").slice(0,19));
+}
+function factorBar(name, score) { const safeScore = Math.max(0, Math.min(100, Number(score || 0))); const color = safeScore >= 75 ? "#39ff14" : safeScore >= 50 ? "#00e5ff" : "#ff003c"; return `<div class="trust-factor"><div class="trust-factor-top"><span class="trust-factor-name">${escapeHtml(name)}</span><span class="trust-factor-pct" style="color:${color}">${safeScore}%</span></div><div class="verify-bar-track"><div class="verify-bar-fill" style="width:${safeScore}%;background:${color}"></div></div></div>`; }
+function buildTimelineData(video) { const history = Array.isArray(video.historyTimeline) ? video.historyTimeline : []; if (history.length > 2) { return { labels: history.map(point => String(point.recorded_at || "").replace("T"," ").slice(0,16)), values: history.map(point => Math.max(1, Number(point.score || point.views || point.source_count || 1))), estimated: false }; } const startDate = new Date(video.firstSourceTime || video.time || new Date().toISOString()); const endDate = new Date(); const totalScore = Math.max(12, Number(video.score || 24)); const sourceFactor = Math.max(1, Number(video.metrics?.sources || video.matchedSources?.length || 1)); const trustFactor = Math.max(35, Number(video.trustBreakdown?.totalTrustScore || 50)); const elapsedHours = Math.max(2, Math.round((endDate.getTime() - startDate.getTime()) / 36e5)); const points = Math.min(8, Math.max(5, Math.round(elapsedHours / 6))); const labels = []; const values = []; for (let i = 0; i < points; i += 1) { const ratio = points === 1 ? 1 : i / (points - 1); const current = new Date(startDate.getTime() + (endDate.getTime() - startDate.getTime()) * ratio); const earlyRise = Math.sin(ratio * Math.PI * 0.9); const midDip = Math.cos(ratio * Math.PI * 1.7) * 0.08; const lateBoost = ratio > 0.7 ? (ratio - 0.7) * 0.45 : 0; const shape = Math.max(0.12, 0.18 + earlyRise * 0.72 + midDip + lateBoost); const score = Math.max(1, Math.round(totalScore * shape + sourceFactor * 8 + trustFactor * 0.2)); labels.push(String(current.toISOString()).replace("T"," ").slice(0,16)); values.push(score); } values[0] = Math.max(1, Math.round(values[0] * 0.45)); values[values.length - 1] = Math.max(values[values.length - 1], Math.round(totalScore)); return { labels, values, estimated: true }; }
+function toggleMatchedSources(event) { event.stopPropagation(); const toggle = document.getElementById("matchedSourcesToggle"); const list = document.getElementById("matchedSourcesList"); if (!toggle || !list) return; toggle.classList.toggle("open"); list.classList.toggle("open"); }
+function openPanel(video) { if (timelineChartInst) timelineChartInst.destroy(); document.getElementById("panel").classList.add("active"); document.getElementById("overlay").classList.add("active"); const firstChannel = video.firstSourceChannel || video.channel, firstTime = video.firstSourceTime || video.time, verify = getVerifyInfo(video), isNewsTopic = video.platform === "GNews" || video.platform === "News API", primaryMetric = isNewsTopic ? "NEWS RANK / FRESHNESS" : video.platform === "Twitter" ? "LIKES / REPOSTS" : "VIEWS", primaryMetricValue = isNewsTopic ? escapeHtml(video.metricSummary || "rank/freshness unavailable") : video.platform === "Twitter" ? escapeHtml(video.metricSummary || "engagement unavailable") : formatNumber(parseCount(video.viewCount)), snapshotMode = Boolean(video.storedSnapshot), matchedSources = Array.isArray(video.matchedSources) && video.matchedSources.length ? video.matchedSources : [{ channel:firstChannel, time:firstTime, link:video.firstSourceLink || video.link, platform:video.platform }], totalSourceCount = snapshotMode ? Number(video.storedSourceCount || matchedSources.length || 1) : matchedSources.length, secondaryMetricLabel = "POSTED SAME CONTENT", secondaryMetricValue = `${totalSourceCount} accounts / sources`, matchedSourcesHtml = snapshotMode ? `<div class="source-entry"><div class="source-entry-main"><span class="source-entry-name">Stored snapshot mode</span><span class="source-entry-meta">Account-level chronological source list is unavailable while live APIs are limited.</span></div></div>` : matchedSources.map(source => `<div class="source-entry"><div class="source-entry-main"><span class="source-entry-name">${escapeHtml(source.channel || "Unknown source")}</span><span class="source-entry-meta">${formatDisplayTime(source.time)} | ${escapeHtml(source.platform || video.platform)}</span></div><a class="source-entry-link" href="${escapeHtml(source.link || "#")}" target="_blank" rel="noopener">OPEN &rsaquo;</a></div>`).join(""), trustBreakdown = video.trustBreakdown || {}, trustFactorsHtml = `<div class="trust-factor-list">${factorBar("Channel Reputation", trustBreakdown.channelReputationScore)}${factorBar("Official Account Verification", trustBreakdown.officialAccountVerificationScore)}${factorBar("Official News Verification", trustBreakdown.officialNewsVerificationScore)}</div>`, timeline = buildTimelineData(video); document.getElementById("details").innerHTML = `<div class="panel-title">${escapeHtml(video.title)}</div><div class="post-block"><div class="post-block-label">ORIGINAL POST CONTENT</div><div class="post-block-text">${escapeHtml(video.postText)}</div></div><div class="info-grid"><div class="info-cell"><div class="info-cell-label">FIRST RESULT SOURCE</div><div class="info-cell-value">${escapeHtml(firstChannel)}<div style="text-align:right;margin-top:8px;"><a href="${escapeHtml(video.firstSourceLink || video.link)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">OPEN FIRST SOURCE &rsaquo;</a></div></div></div><div class="info-cell"><div class="info-cell-label">FIRST RESULT TIME</div><div class="info-cell-value">${formatDisplayTime(firstTime)}</div></div><div class="info-cell"><div class="info-cell-label">OTHER MATCHES</div><div class="info-cell-value">${Math.max(totalSourceCount - 1, 0)} results</div></div><div class="info-cell"><div class="info-cell-label">PLATFORM</div><div class="info-cell-value">${escapeHtml(video.platform)}</div></div><div class="info-cell"><div class="info-cell-label">${primaryMetric}</div><div class="info-cell-value">${primaryMetricValue}</div></div><div class="info-cell"><div class="info-cell-label">${secondaryMetricLabel}</div><div class="info-cell-value">${secondaryMetricValue}</div></div><div class="info-cell" style="grid-column:span 2;"><div class="info-cell-label">MATCHED ACCOUNTS / SOURCES</div><div class="source-toggle" id="matchedSourcesToggle" onclick="toggleMatchedSources(event)"><span>${snapshotMode ? `${totalSourceCount} recorded sources (snapshot)` : `${matchedSources.length} sources in chronological order`}</span><span class="arrow">&#x25BC;</span></div><div class="source-list" id="matchedSourcesList">${matchedSourcesHtml}</div></div><div class="info-cell" style="grid-column:span 2;"><div class="info-cell-label">TOTAL TRUST SCORE</div><div class="info-cell-value">${verify.pct}%</div><div class="verify-bar-track"><div class="verify-bar-fill" style="width:${verify.pct}%;background:${verify.color}"></div></div></div><div class="info-cell" style="grid-column:span 2;"><div class="info-cell-label">TRUST FACTORS</div>${trustFactorsHtml}</div><div class="info-cell" style="grid-column:span 2;"><div class="info-cell-label">AI FEEDBACK</div><div class="info-cell-value">${escapeHtml(trustBreakdown.aiFeedback || video.aiFeedback || "AI feedback unavailable.")}</div></div></div>`; timelineChartInst = new Chart(document.getElementById("timelineChart"), { type:"line", data:{ labels:timeline.labels, datasets:[{ label:timeline.estimated ? "Estimated virality trend" : "Recorded virality trend", data:timeline.values, fill:true, backgroundColor:"rgba(0,229,255,0.07)", borderColor:"#00e5ff", pointBackgroundColor:"#00e5ff", borderWidth:2, tension:.32 }] }, options:{ plugins:{ legend:{ display:false } }, scales:{ x:{ grid:{ color:"rgba(15,76,110,0.4)" }, ticks:{ color:"#4a7a99", maxRotation:0, autoSkip:true, maxTicksLimit:6 } }, y:{ grid:{ color:"rgba(15,76,110,0.4)" }, ticks:{ color:"#4a7a99" } } } } }); const aiReport = document.getElementById("aiReportBody"); aiReport.className = "ai-report-body loading"; aiReport.textContent = timeline.estimated ? "Building estimated virality curve from first source time to current time..." : "Rendering recorded virality history..."; setTimeout(() => renderAIReport(buildReport(video, verify, getOfficialSources(video))), 500); }
+function closePanel() { document.getElementById("panel").classList.remove("active"); document.getElementById("overlay").classList.remove("active"); }
+</script>
+</body>
+</html>
